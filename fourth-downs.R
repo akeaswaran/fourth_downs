@@ -12,97 +12,74 @@ library(progressr)
 library(webshot2)
 
 save_crop_gt <- function(gt_obj, file, whitespace = 50) {
-    gtExtras::gtsave_extra(gt_obj, paste0("./export/", file), zoom = 2)
+    gtExtras::gtsave_extra(gt_obj, paste0("./export/14_24_", file), zoom = 2)
 
-    magick::image_read(file) |>
+    magick::image_read(paste0("./export/14_24_", file)) |>
         image_trim() |>
         image_border("white", glue::glue('{whitespace}x{whitespace}')) |>
-        image_write(file)
+        image_write(paste0("./export/14_24_", file))
 }
 
 # get all games ----
-games_raw = purrr::map(2014:2023, cfbfastR::cfbd_game_info)
-games = dplyr::bind_rows(games_raw) %>%
-    filter(home_division == "fbs" & away_division == "fbs")
+# games_raw = purrr::map(2014:2024, cfbfastR::cfbd_game_info)
+# games = dplyr::bind_rows(games_raw) %>%
+#     filter(home_division == "fbs" & away_division == "fbs")
 
 # get all betting data for games ----
-# bets_raw <- purrr::map(2014:2023, function(x) {
-#     t = cfbd_betting_lines(year = x)
-#     if ("home_conference" %in% colnames(t)) {
-#         t = t %>%
-#             mutate(
-#                 home_conference = as.character(home_conference),
-#             )
-#     } else {
-#         t = t %>%
-#             mutate(
-#                 home_conference = NA_character_,
-#             )
-#     }
-#
-#     if ("away_conference" %in% colnames(t)) {
-#         t = t %>%
-#             mutate(
-#                 away_conference = as.character(away_conference),
-#             )
-#     } else {
-#         t = t %>%
-#             mutate(
-#                 away_conference = NA_character_,
-#             )
-#     }
-#
-#     return(t)
-# })
-#
-# bets = bets_raw %>%
-#     dplyr::bind_rows() %>%
-#     dplyr::mutate(
-#         provider = factor(.data$provider,
-#                           c(
-#                               "consensus",
-#                               "teamrankings",
-#                               "numberfire",
-#                               "Caesars",
-#                               "Caesars (Pennsylvania)",
-#                               "William Hill (New Jersey)",
-#                               "SugarHouse",
-#                               "Bovada"
-#                           )),
-#         spread = as.numeric(.data$spread),
-#         over_under = as.numeric(.data$over_under)
-#     ) %>%
-#     dplyr::group_by(.data$game_id) %>%
-#     dplyr::arrange(.data$provider) %>%
-#     dplyr::slice(1) %>%
-#     dplyr::select(
-#         "game_id",
-#         "spread",
-#         "over_under"
-#     ) %>%
-#     dplyr::filter(game_id %in% games$game_id)
+bets_raw = readRDS("./data/14_24_lines.RDS")
+games = bets_raw %>% mutate(game_id = as.factor(game_id)) %>% distinct(game_id, .keep_all = T) %>% dplyr::select(game_id, start_date, home_team, home_conference, away_team, away_conference)
+bets = bets_raw %>%
+    dplyr::filter(home_classification == "fbs" & away_classification == "fbs") %>%
+    dplyr::mutate(
+        provider = factor(.data$provider,
+                          c(
+                              "consensus",
+                              "ESPN Bet",
+                              "DraftKings",
+                              "teamrankings",
+                              "numberfire",
+                              "Caesars",
+                              "Caesars (Pennsylvania)",
+                              "William Hill (New Jersey)",
+                              "SugarHouse",
+                              "Bovada"
+                          )),
+        spread = as.numeric(.data$spread),
+        over_under = as.numeric(.data$over_under)
+    ) %>%
+    dplyr::group_by(.data$game_id) %>%
+    dplyr::arrange(.data$provider) %>%
+    dplyr::slice(1) %>%
+    dplyr::select(
+        "game_id",
+        "spread",
+        "over_under"
+    )
 #
 # retrieve all pbp and join with betting data ----
-# pbp_raw = cfbfastR::load_cfb_pbp(2014:2023) %>%
-#     dplyr::filter(game_id %in% games$game_id) %>%
+# pbp_raw = cfbfastR::load_cfb_pbp(2014:2024) %>%
+#     dplyr::filter(game_id %in% bets$game_id) %>%
 #     dplyr::left_join(bets, by = "game_id")
+# pbp_raw %>% saveRDS("./data/14_24_pbp.RDS")
 #
 # add 4th down probs to pbp ----
+# pbp_raw = readRDS("./data/14_24_pbp.RDS")
 # pbp_chunks = purrr::map(sort(unique(pbp_raw$year)), function(x) {
 #     pbp_raw %>%
-#         filter(
+#         dplyr::filter(
 #             down == 4
-#             & game_id %in% games$game_id
+#             # & game_id %in% games$game_id
 #             & year == x
 #         ) %>%
 #         cfb4th::add_4th_probs()
 # })
 # pbp = dplyr::bind_rows(pbp_chunks)
-#
+
 # cache pbp with probs
-# pbp %>% saveRDS("./data/pbp_4th.RDS")
+# pbp %>% saveRDS("./data/14_24_pbp_4th.RDS")
 #
 # use make table function from bot to assemble full dataset ----
+# pbp <- readRDS("./data/14_24_pbp_4th.RDS")
 # tictoc::tic("Fourth down table probs assembly")
 # fourth_table_probs_raw = lapply(1:nrow(pbp), function(i) {
 #                 row = pbp[i, ]
@@ -114,163 +91,163 @@ games = dplyr::bind_rows(games_raw) %>%
 # })
 # fourth_table_probs = dplyr::bind_rows(fourth_table_probs_raw)
 # tictoc::toc()
-# cache decisions + probs
-# fourth_table_probs %>% saveRDS("./data/4th_table_probs.RDS")
+# # cache decisions + probs
+# fourth_table_probs %>% saveRDS("./data/14_24_4th_table_probs.RDS")
 
 # # merge plays and probs to get final(-ish) dataset ----
-# pbp = readRDS("./data/pbp_4th.RDS")
-# slim_pbp = pbp %>%
-#     mutate(
-#         id_play = as.factor(id_play),
-#         game_id = as.factor(game_id),
-#         choice = dplyr::case_when(
-#             # football to punt
-#             play_type %in% c("Blocked Punt", "Punt","Safety", "Blocked Punt Touchdown","Punt Return Touchdown") | grepl("Punt", play_type) ~ "Punt",
-#             # field goal
-#             play_type %in% c("Field Goal Good", "Field Goal Missed","Blocked Field Goal") ~ "Field goal attempt",
-#             # go for it
-#             play_type %in% c("Pass Incompletion", "Pass Reception", "Passing Touchdown",
-#                              "Rush", "Rushing Touchdown", "Sack","Interception",
-#                              "Fumble Recovery (Opponent)","Pass Interception Return",
-#                              "Fumble Return Touchdown") | rush == 1 | pass == 1 ~ "Go for it",
-#             # penalty
-#             play_type %in% c("Penalty") ~ "Penalty",
-#             play_type %in% c("Timeout") ~ "Timeout",
-#             TRUE ~ NA_character_
-#         )
-#     ) %>%
-#     select(game_id, play_id = id_play, actual_choice = choice, play_type, play_text, pos_team, season = year, period, home_wp_before, away_wp_before)
-#
-# fourth_table_probs = readRDS("./data/4th_table_probs.RDS") %>%
-#     mutate(
-#         play_id = as.factor(play_id),
-#         game_id = as.factor(game_id)
-#     )
-#
-# fourth_down_decisions_raw = fourth_table_probs %>%
-#     left_join(slim_pbp, by = c("game_id", "play_id")) %>%
-#     group_by(game_id, play_id, choice) %>%
-#     slice_min(order_by = row_number(), n = 1, with_ties = F) %>%
-#     ungroup() %>%
-#     left_join(games %>% mutate(game_id = as.factor(game_id)) %>% select(game_id, home_team, home_conference, away_team, away_conference), by = "game_id") %>%
-#     mutate(
-#         pos_team_conference = dplyr::case_when(
-#             pos_team == home_team ~ home_conference,
-#             pos_team == away_team ~ away_conference
-#         ),
-#         pos_team_wp_before = dplyr::case_when(
-#             pos_team == home_team ~ home_wp_before,
-#             pos_team == away_team ~ away_wp_before
-#         )
-#     )
-#
-# # summarizer method
-# annotate_fourth_downs = function(df) {
-#     df %>%
-#         filter(
-#             !(actual_choice %in% c("Timeout", "Penalty"))
-#         ) %>%
-#         group_by(game_id, play_id) %>%
-#         arrange(-choice_prob) %>%
-#         mutate(
-#             optimal = row_number() == 1
-#         ) %>%
-#         summarize(
-#             season = last(season),
-#             pos_team = last(pos_team),
-#             pos_team_conference = last(pos_team_conference),
-#             period = last(period),
-#             pos_team_wp_before = last(pos_team_wp_before),
-#             actual_choice = last(actual_choice),
-#             optimal_choice = .data$choice[which(.data$optimal == 1)],
-#             wp_diff = .data$choice_prob[1] - .data$choice_prob[2]
-#         ) %>%
-#         ungroup() %>%
-#         filter(!is.na(wp_diff)) %>%
-#         mutate(
-#             confidence = case_when(
-#                 abs(wp_diff) < 1 ~ "LOW",
-#                 abs(wp_diff) >= 1 & abs(wp_diff) < 3 ~ "MEDIUM",
-#                 abs(wp_diff) >= 3 & abs(wp_diff) <= 10 ~ "STRONG",
-#                 abs(wp_diff) > 10 ~ "VERY STRONG"
-#             ),
-#             was_meaningful = (
-#                 period == 1 | (pos_team_wp_before >= 0.2 & pos_team_wp_before <= 0.8)
-#             ),
-#             was_obvious = abs(wp_diff) >= 1.5 & was_meaningful,
-#             was_optimal = actual_choice == optimal_choice
-#         )
-# }
-#
-# # get first pass data set with summarizer method
-# fourth_down_decisions = fourth_down_decisions_raw %>%
-#     # rows_upsert(missing_probs, by = c("game_id", "play_id", "choice")) %>%
-#     annotate_fourth_downs()
-#
-# # handle rows with missing probs ----
-# # usually those with <= 30 sec on clock
-# missing_probs_raw = fourth_down_decisions %>%
-#     filter(is.na(wp_diff))
-#
-# if (nrow(missing_probs_raw) > 0) {
-#     missing_probs_list = lapply(unique(missing_probs_raw$play_id), function(x) {
-#         base_play = pbp %>%
-#             filter(id_play == x) %>%
-#             group_by(game_id, id_play) %>%
-#             slice_min(order_by = row_number(), n = 1, with_ties = F) %>%
-#             ungroup()
-#
-#         tryCatch({
-#             base_play %>%
-#                 mutate(type = NA_character_) %>%
-#                 select(-all_of(c("go_boost", "first_down_prob","wp_fail","wp_succeed","go_wp","fg_make_prob","miss_fg_wp","make_fg_wp","fg_wp","punt_wp"   ))) %>%
-#                 cfb4th::add_4th_probs() %>%
-#                 cfb4th::make_table_data() %>%
-#                 mutate(
-#                     play_id = x,
-#                     game_id = base_play$game_id
-#                 ) %>%
-#                 return()
-#         }, error = function(e) {
-#             print(glue::glue("{x}: {e}"))
-#             return(NULL)
-#         })
-#     })
-#
-#     missing_probs = missing_probs_list[!sapply(missing_probs_list, is.null)] %>%
-#         dplyr::bind_rows() %>%
-#         mutate(
-#             game_id = as.factor(game_id),
-#             play_id = as.factor(play_id)
-#         ) %>%
-#         left_join(slim_pbp, by = c("game_id", "play_id")) %>%
-#         group_by(game_id, play_id, choice) %>%
-#         slice_min(order_by = row_number(), n = 1, with_ties = F) %>%
-#         ungroup() %>%
-#         left_join(games %>% mutate(game_id = as.factor(game_id)) %>% select(game_id, home_team, home_conference, away_team, away_conference), by = "game_id") %>%
-#         mutate(
-#             pos_team_conference = dplyr::case_when(
-#                 pos_team == home_team ~ home_conference,
-#                 pos_team == away_team ~ away_conference
-#             ),
-#             pos_team_wp_before = dplyr::case_when(
-#                 pos_team == home_team ~ home_wp_before,
-#                 pos_team == away_team ~ away_wp_before
-#             )
-#         )
-#
-#     # merge missing + existing datasets to get final-final dataset ----
-#     fourth_down_decisions <- fourth_down_decisions_raw %>%
-#         rows_upsert(missing_probs, by = c("game_id", "play_id", "choice")) %>%
-#         annotate_fourth_downs()
-# }
-#
-#
-# # cache final dataset
-# fourth_down_decisions %>% saveRDS("./data/fourth_down_decisions_14_23.RDS")
+pbp = readRDS("./data/14_24_pbp_4th.RDS")
+slim_pbp = pbp %>%
+    mutate(
+        id_play = as.factor(id_play),
+        game_id = as.factor(game_id),
+        choice = dplyr::case_when(
+            # football to punt
+            play_type %in% c("Blocked Punt", "Punt","Safety", "Blocked Punt Touchdown","Punt Return Touchdown") | grepl("Punt", play_type) ~ "Punt",
+            # field goal
+            play_type %in% c("Field Goal Good", "Field Goal Missed","Blocked Field Goal") ~ "Field goal attempt",
+            # go for it
+            play_type %in% c("Pass Incompletion", "Pass Reception", "Passing Touchdown",
+                             "Rush", "Rushing Touchdown", "Sack","Interception",
+                             "Fumble Recovery (Opponent)","Pass Interception Return",
+                             "Fumble Return Touchdown") | rush == 1 | pass == 1 ~ "Go for it",
+            # penalty
+            play_type %in% c("Penalty") ~ "Penalty",
+            play_type %in% c("Timeout") ~ "Timeout",
+            TRUE ~ NA_character_
+        )
+    ) %>%
+    select(game_id, play_id = id_play, actual_choice = choice, play_type, play_text, pos_team, season = year, period, home_wp_before, away_wp_before)
+
+fourth_table_probs = readRDS("./data/14_24_4th_table_probs.RDS") %>%
+    mutate(
+        play_id = as.factor(play_id),
+        game_id = as.factor(game_id)
+    )
+
+fourth_down_decisions_raw = fourth_table_probs %>%
+    dplyr::left_join(slim_pbp, by = c("game_id", "play_id")) %>%
+    dplyr::group_by(game_id, play_id, choice) %>%
+    dplyr::slice_min(order_by = dplyr::row_number(), n = 1, with_ties = F) %>%
+    dplyr::ungroup() %>%
+    dplyr::left_join(games, by = "game_id") %>%
+    dplyr::mutate(
+        pos_team_conference = dplyr::case_when(
+            pos_team == home_team ~ home_conference,
+            pos_team == away_team ~ away_conference
+        ),
+        pos_team_wp_before = dplyr::case_when(
+            pos_team == home_team ~ home_wp_before,
+            pos_team == away_team ~ away_wp_before
+        )
+    )
+
+# summarizer method
+annotate_fourth_downs = function(df) {
+    df %>%
+        filter(
+            !(actual_choice %in% c("Timeout", "Penalty"))
+        ) %>%
+        group_by(game_id, play_id) %>%
+        arrange(-choice_prob) %>%
+        mutate(
+            optimal = row_number() == 1
+        ) %>%
+        summarize(
+            season = last(season),
+            pos_team = last(pos_team),
+            pos_team_conference = last(pos_team_conference),
+            period = last(period),
+            pos_team_wp_before = last(pos_team_wp_before),
+            actual_choice = last(actual_choice),
+            optimal_choice = .data$choice[which(.data$optimal == 1)],
+            wp_diff = .data$choice_prob[1] - .data$choice_prob[2]
+        ) %>%
+        ungroup() %>%
+        filter(!is.na(wp_diff)) %>%
+        mutate(
+            confidence = case_when(
+                abs(wp_diff) < 1 ~ "LOW",
+                abs(wp_diff) >= 1 & abs(wp_diff) < 3 ~ "MEDIUM",
+                abs(wp_diff) >= 3 & abs(wp_diff) <= 10 ~ "STRONG",
+                abs(wp_diff) > 10 ~ "VERY STRONG"
+            ),
+            was_meaningful = (
+                period == 1 | (pos_team_wp_before >= 0.2 & pos_team_wp_before <= 0.8)
+            ),
+            was_obvious = abs(wp_diff) >= 1.5 & was_meaningful,
+            was_optimal = actual_choice == optimal_choice
+        )
+}
+
+# get first pass data set with summarizer method
+fourth_down_decisions = fourth_down_decisions_raw %>%
+    # rows_upsert(missing_probs, by = c("game_id", "play_id", "choice")) %>%
+    annotate_fourth_downs()
+
+# handle rows with missing probs ----
+# usually those with <= 30 sec on clock
+missing_probs_raw = fourth_down_decisions %>%
+    filter(is.na(wp_diff))
+
+if (nrow(missing_probs_raw) > 0) {
+    missing_probs_list = lapply(unique(missing_probs_raw$play_id), function(x) {
+        base_play = pbp %>%
+            filter(id_play == x) %>%
+            group_by(game_id, id_play) %>%
+            slice_min(order_by = row_number(), n = 1, with_ties = F) %>%
+            ungroup()
+
+        tryCatch({
+            base_play %>%
+                mutate(type = NA_character_) %>%
+                select(-all_of(c("go_boost", "first_down_prob","wp_fail","wp_succeed","go_wp","fg_make_prob","miss_fg_wp","make_fg_wp","fg_wp","punt_wp"   ))) %>%
+                cfb4th::add_4th_probs() %>%
+                cfb4th::make_table_data() %>%
+                mutate(
+                    play_id = x,
+                    game_id = base_play$game_id
+                ) %>%
+                return()
+        }, error = function(e) {
+            print(glue::glue("{x}: {e}"))
+            return(NULL)
+        })
+    })
+
+    missing_probs = missing_probs_list[!sapply(missing_probs_list, is.null)] %>%
+        dplyr::bind_rows() %>%
+        mutate(
+            game_id = as.factor(game_id),
+            play_id = as.factor(play_id)
+        ) %>%
+        left_join(slim_pbp, by = c("game_id", "play_id")) %>%
+        group_by(game_id, play_id, choice) %>%
+        slice_min(order_by = row_number(), n = 1, with_ties = F) %>%
+        ungroup() %>%
+        left_join(games %>% mutate(game_id = as.factor(game_id)) %>% select(game_id, home_team, home_conference, away_team, away_conference), by = "game_id") %>%
+        mutate(
+            pos_team_conference = dplyr::case_when(
+                pos_team == home_team ~ home_conference,
+                pos_team == away_team ~ away_conference
+            ),
+            pos_team_wp_before = dplyr::case_when(
+                pos_team == home_team ~ home_wp_before,
+                pos_team == away_team ~ away_wp_before
+            )
+        )
+
+    # merge missing + existing datasets to get final-final dataset ----
+    fourth_down_decisions <- fourth_down_decisions_raw %>%
+        rows_upsert(missing_probs, by = c("game_id", "play_id", "choice")) %>%
+        annotate_fourth_downs()
+}
+
+
+# cache final dataset
+fourth_down_decisions %>% saveRDS("./data/fourth_down_decisions_14_24.RDS")
 
 # Start actual analysis ----
-fourth_down_decisions = readRDS("./data/fourth_down_decisions_14_23.RDS")
+fourth_down_decisions = readRDS("./data/fourth_down_decisions_14_24.RDS")
 
 # Overall aggression on 4th downs / conversion attempts rate trend ----
 fourth_down_decisions %>%
@@ -490,7 +467,7 @@ optimal_wp_ranks = fourth_down_decisions %>%
     ungroup() %>%
     arrange(season) %>%
     filter(
-        season == 2023
+        season == 2024
     ) %>%
     arrange(-optimal_wp_added) %>%
     select(-pos_team_conference, -season, -n_unoptimal, -pct_unoptimal)
@@ -505,12 +482,12 @@ optimal_wp_ranks %>%
     gt() %>%
     gt_theme_538() %>%
     tab_header(
-        title = md(glue::glue("**Washington makes the grade**")),
-        subtitle = md("The Huskies nailed all but one of their 'obvious-go' decisions en route to a CFP Championship Game appearance, adding over half a win in the process.")
+        title = md(glue::glue("**What Happens in Vegas...**")),
+        subtitle = md("UNLV rolled the dice and hit paydirt more often than not, adding nearly an entire win off optimal fourth-down decisions in 2024.")
     ) %>%
     tab_footnote(
         footnote = "'obvious-go' situation: a fourth down where attempting the conversion has an expected win probability that is 1.5% or better than that of a field goal or punt AND is in the first quarter OR the offense has a win probability above 10%.",
-        locations = cells_title(groups = "subtitle")
+        locations = cells_column_labels(columns = "count")
     ) %>%
     cols_align(columns = c("pos_team"), align = "left") %>%
     cols_align(columns = c("count", "n_optimal"), align = "center") %>%
@@ -580,7 +557,7 @@ optimal_wp_ranks %>%
         }
       '
     ) %>%
-    save_crop_gt("optimal_wp_added_nation.png")
+    save_crop_gt("top_optimal_wp_added_nation.png")
 
 optimal_wp_ranks %>%
     mutate(
@@ -597,12 +574,12 @@ optimal_wp_ranks %>%
     gt() %>%
     gt_theme_538() %>%
     tab_header(
-        title = md(glue::glue("**Hurri-can't**")),
-        subtitle = md("Miami forfeited critical chances to shift the odds in their favor by failing to make smart 'obvious-go' decisions.")
+        title = md(glue::glue("**Midwest Swoon**")),
+        subtitle = md("Iowa State just barely edges out in-state rival Iowa in yet another battle for the CyHawk Trophy...except this title might not be one the Cyclones want to keep.")
     ) %>%
     tab_footnote(
         footnote = "'obvious-go' situation: a fourth down where attempting the conversion has an expected win probability that is 1.5% or better than that of a field goal or punt AND is in the first quarter OR the offense has a win probability above 10%.",
-        locations = cells_title(groups = "subtitle")
+        locations = cells_column_labels(columns = count)
     ) %>%
     cols_align(columns = c("pos_team"), align = "left") %>%
     cols_align(columns = c("count", "n_optimal"), align = "center") %>%
@@ -671,7 +648,7 @@ optimal_wp_ranks %>%
         }
       '
     ) %>%
-    save_crop_gt("unoptimal_wp_added_nation.png")
+    save_crop_gt("top_unoptimal_wp_added_nation.png")
 
 
 optimal_wp_ranks %>%
@@ -686,12 +663,12 @@ optimal_wp_ranks %>%
     gt() %>%
     gt_theme_538() %>%
     tab_header(
-        title = md(glue::glue("**Greek Tragedy**")),
-        subtitle = md("Schools from both Athens were wasteful in 'obvious-go' situations, catching smaller trout but not frying the bigger fish.")
+        title = md(glue::glue("**Not So Smart?**")),
+        subtitle = md("Kirby Smart continues to be wasteful on fourth down.")
     ) %>%
     tab_footnote(
         footnote = "'obvious-go' situation: a fourth down where attempting the conversion has an expected win probability that is 1.5% or better than that of a field goal or punt AND is in the first quarter OR the offense has a win probability above 10%.",
-        locations = cells_title(groups = "subtitle")
+        locations = cells_column_labels(columns = count)
     ) %>%
     cols_align(columns = c("pos_team"), align = "left") %>%
     cols_align(columns = c("count", "n_optimal"), align = "center") %>%
@@ -774,12 +751,12 @@ optimal_wp_ranks %>%
     gt() %>%
     gt_theme_538() %>%
     tab_header(
-        title = md(glue::glue("**Washington makes the grade**")),
-        subtitle = md("The Huskies nailed all but one of their 'obvious-go' decisions en route to a CFP Championship Game appearance, adding over half a win in the process.")
+        title = md(glue::glue("**What Happens in Vegas...**")),
+        subtitle = md("UNLV managed to limit the damage of even their bad go decisions and still net over half a win on their fourth-down decision making in 2024.")
     ) %>%
     tab_footnote(
         footnote = "'obvious-go' situation: a fourth down where attempting the conversion has an expected win probability that is 1.5% or better than that of a field goal or punt AND is in the first quarter OR the offense has a win probability above 10%.",
-        locations = cells_title(groups = "subtitle")
+        locations = cells_column_labels(columns = count)
     ) %>%
     cols_align(columns = c("pos_team"), align = "left") %>%
     cols_align(columns = c("count", "n_optimal"), align = "center") %>%
@@ -1011,7 +988,7 @@ team_overcorrection %>%
     tab_source_note(source_note = md(
         "Data from cfbfastR and cfb4th. Table assembled by @akeaswaran. Note: table includes team-seasons with 5+ 'obvious non-go' situations."
     )) %>%
-    save_crop_gt("1423_overcorrection_team_seasons.png") #%>%
+    save_crop_gt("overcorrection_team_seasons.png") #%>%
     # tab_footnote(
     #     footnote = "COVID-shortened season.",
     #     locations = cells_body(columns = season, rows = 7)
@@ -1303,8 +1280,8 @@ fourth_down_decisions %>%
         wp_or_quarter = 1
         # min_count = 3
     ) %>%
-    generate_conference_table_graphic("ACC", "The ACC is, as always, unpredictable", "A conference that now improbably includes schools from California and Texas ramped up how it dealt with 'obvious-go' situations in 2023.") %>%
-    save_crop_gt("acc_trends_1423.png")
+    generate_conference_table_graphic("ACC", "The ACC is, as always, unpredictable", "A conference that now improbably includes schools from California and Texas ramped up how it dealt with 'obvious-go' situations in 2024.") %>%
+    save_crop_gt("acc_trends.png")
 
 generate_conference_team_graphic = function(df, conference, year, title, subtitle) {
     df %>%
@@ -1618,8 +1595,8 @@ fourth_down_decisions %>%
         wp_or_quarter = 1
         # min_count = 5
     ) %>%
-    generate_conference_team_graphic("ACC", 2023, "Boston College: The Smartest School in the ACC?", "In a surprise twist, the Eagles -- not conference champion FSU -- led the ACC in 'obvious-go' rate in 2023.") %>%
-    save_crop_gt("acc_rate_23.png")
+    generate_conference_team_graphic("ACC", 2024, "Boston College: The Smartest School in the ACC?", "In a surprise twist, the Eagles -- not conference champion FSU -- led the ACC in 'obvious-go' rate in 2024.") %>%
+    save_crop_gt("acc_rate.png")
 
 
 fourth_down_decisions %>%
@@ -1631,8 +1608,8 @@ fourth_down_decisions %>%
         wp_or_quarter = 1,
         # min_count = 5
     ) %>%
-    generate_conference_optimal_wp_added_graphic("ACC", 2023, "Demon Deacons pass the test", "While BC led the conference in 'obvious-go' rate in 2023, Wake Forest gained the most win probability off of their go decisions.") %>%
-    save_crop_gt("optimal_wp_added_acc_23.png")
+    generate_conference_optimal_wp_added_graphic("ACC", 2024, "Demon Deacons pass the test", "While BC led the conference in 'obvious-go' rate in 2024, Wake Forest gained the most win probability off of their go decisions.") %>%
+    save_crop_gt("optimal_wp_added_acc.png")
 
 fourth_down_decisions %>%
     analyze_decisions(
@@ -1643,8 +1620,8 @@ fourth_down_decisions %>%
         wp_or_quarter = 1,
         # min_count = 5
     ) %>%
-    generate_conference_unoptimal_wp_added_graphic("ACC", 2023, "Tropical Depression", "Despite being runner up the ACC in win probability gained off correct 'obvious-go' decisions (+32.6%), Miami nearly gave that entire advantage back with their missed decisions.") %>%
-    save_crop_gt("unoptimal_wp_added_acc_23.png")
+    generate_conference_unoptimal_wp_added_graphic("ACC", 2024, "Tropical Depression", "Despite being runner up the ACC in win probability gained off correct 'obvious-go' decisions (+32.6%), Miami nearly gave that entire advantage back with their missed decisions.") %>%
+    save_crop_gt("unoptimal_wp_added_acc.png")
 
 generate_conference_net_wp_added_graphic = function(df, conference, year, title, subtitle) {
     df %>%
@@ -1755,12 +1732,13 @@ fourth_down_decisions %>%
         wp_or_quarter = 1,
         # min_count = 5
     ) %>%
-    generate_conference_net_wp_added_graphic("ACC", 2023, md("~~Super~~ Extremely Mid Mario"), "Mario Cristobal and Miami both underperformed the national average in 'obvious-go' rate AND produced such highly volatile outcomes that their decision making had nearly zero net impact.") %>%
-    save_crop_gt("net_wp_added_acc_23.png")
+    generate_conference_net_wp_added_graphic("ACC", 2024, md("~~Super~~ Extremely Mid Mario"), "Mario Cristobal and Miami both underperformed the national average in 'obvious-go' rate AND produced such highly volatile outcomes that their decision making had nearly zero net impact.") %>%
+    save_crop_gt("net_wp_added_acc.png")
 
 # team historic performance ----
 
 # generate_team_history_table_graphic = function(team, title, subtitle) {
+
 fourth_down_decisions %>%
     analyze_decisions(
         # actual_choice = "Go for it",
@@ -1804,17 +1782,21 @@ fourth_down_decisions %>%
     select(season, pos_team, count, n_optimal, pct_optimal, rank_optimal, net_wp_added, rank_net_wp) %>%
     filter(
         # (pos_team == "Western Kentucky" & season %in% 2014:2016)
-        # | (pos_team == "Purdue" & season %in% 2017:2022)
-        # | (pos_team == "Louisville" & season >= 2023)
-        pos_team == "Alabama"
+        # (pos_team == "Purdue" & season %in% 2017:2022)
+        # (pos_team == "Louisville" & season >= 2024)
+        # pos_team == "Alabama"
+        pos_team == "Georgia" & season >= 2016
     ) %>%
     # filter(pos_team == !!team) %>%
     # head(15) %>%
-    cbbplotR::gt_cbb_teams(pos_team, pos_team, include_name = T) |>
+    cbbplotR::gt_cbb_teams(pos_team, pos_team, include_name = T) %>%
+    dplyr::mutate(
+        pos_team = dplyr::if_else(stringr::str_detect(pos_team, "61.png"), '<img style="margin-bottom: 0; vertical-align: middle;" width="35px" src="https://raw.githubusercontent.com/saiemgilani/game-on-paper-app/main/frontend/public/assets/img/ennui-uga.png"/> georgia', pos_team),
+    ) %>%
     gt() %>%
     gt_theme_538() %>%
     tab_header(
-        title = md("**Nick Saban: Historic Trends**"),
+        title = md("**kirby smart: Historic Trends**"),
         # subtitle = md("Fickell's teams have been all over the place in terms of 'obvious-go' rate. Even in his most successful seasons at Cincinnati (2020 and 2021), he was not consistent in his decision-making (albeit in a small sample).")
     ) %>%
     tab_footnote(
@@ -1885,6 +1867,6 @@ fourth_down_decisions %>%
              padding-bottom: 6px;
             }
       '
-    ) #%>% save_crop_gt("fickell.png")
+    ) %>% save_crop_gt("kirby.png")
 # }
 
